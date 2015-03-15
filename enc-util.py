@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 import struct
 import libnacl
@@ -21,7 +23,6 @@ sign_key = libnacl.public.SecretKey()
 
 mapbytes = lambda x: [int(i) for i in x]
 
-
 securemetadata = {
     "key": mapbytes(sym_key),
     "nonce_bytes": mapbytes(nonce_bytes),
@@ -33,7 +34,7 @@ encryptedsecuremetadata = smdbox.encrypt(binarysecuremetadata)
 
 metadata = {
     "algorithm": "curve25519-salsa20-vblock",
-    "sign_key": mapbytes(sign_key.sk),
+    "sign_key": mapbytes(sign_key.pk),
     "secure": mapbytes(encryptedsecuremetadata),
 }
 
@@ -41,8 +42,8 @@ encodedmetadata = simpleubjson.encode(metadata)
 
 metalength = len(encodedmetadata)
 
-magicbytes = b'ab'
-version = 1
+magicbytes = b'BR'
+version = 2
 
 sys.stdout.buffer.write(magicbytes)
 
@@ -52,7 +53,7 @@ sys.stdout.buffer.write(firstbytes)
 
 sys.stdout.buffer.write(encodedmetadata)
 
-def encrypt(data):
+def encrypt(data, stdout):
     counter = 0
     block = data.read(block_size)
     while len(block) > 0:
@@ -63,11 +64,14 @@ def encrypt(data):
         nonce = nonce_bytes + counter_bytes
         
         eblock = libnacl.crypto_stream_xor(block, nonce, sym_key)
-        yield eblock
+        #yield eblock
+        stdout.write(eblock)
         block = data.read(block_size)
 
-for i in encrypt(sys.stdin.buffer):
-    sys.stdout.buffer.write(i)
+#for i in encrypt(sys.stdin.buffer):
+#    sys.stdout.buffer.write(i)
+
+encrypt(sys.stdin.buffer, sys.stdout.buffer)
 
         
     
