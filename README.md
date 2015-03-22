@@ -15,14 +15,14 @@ optional arguments:
                         Secret key used for decryption or for signing
   -va, --verify-all     Sign each chunk of the datastream if encrypting, or
                         verify each chunk of the datastream if decrypting.
-                        This ensures data integrity
+                        This ensures data integrity. This is not yet supported
   -d, --decrypt         Decrypt stdin and put it on stdout
-  -s, --symmetric       Use symmetric encryption, not yet supported
+  -s, --symmetric       Use symmetric encryption. This is not yet supported
   -f, --force           Force decryption when verification of signatures fail.
                         Note: only applicable when decrypting a symmetric
                         stream that has each chunk of the datastream signed.
                         Useful for decrypting data that may have been slightly
-                        corrupted.
+                        corrupted. This is not yet supported.
   -g, --generate        Generate a secret and public key pair
   -bs BLOCK_SIZE, --block-size BLOCK_SIZE
                         Block size of chunks in bytes
