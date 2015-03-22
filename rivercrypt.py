@@ -1,0 +1,121 @@
+#!/usr/bin/python
+import sys
+import struct
+import os.path
+import argparse
+import simpleubjson
+import libnacl
+import libnacl.utils
+import libnacl.public
+
+
+def parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-pk", "--public-key", type=str, help="Public key used for encryption or for checking the signature")
+    parser.add_argument("-sk", "--secret-key", type=str, help="Secret key used for decryption or for signing")
+    parser.add_argument("-va", "--verify-all", action="store_true", help="Sign each chunk of the datastream if encrypting, or verify each chunk of the datastream if decrypting. This ensures data integrity")
+    parser.add_argument("-d", "--decrypt", action="store_true", help="Decrypt stdin and put it on stdout")
+    parser.add_argument("-s", "--symmetric", action="store_true", help="Use symmetric encryption, not yet supported")
+    parser.add_argument("-f", "--force", action="store_true", help="Force decryption when verification of signatures fail. Note: only applicable when decrypting a symmetric stream that has each chunk of the datastream signed. Useful for decrypting data that may have been slightly corrupted.")
+    parser.add_argument("-g", "--generate", action="store_true", help="Generate a secret and public key pair")
+    parser.add_argument("-bs", "--block-size", type=int, default=512, help="Block size of chunks in bytes")
+    return parser.parse_args()
+
+# mapbytes and unmapbtyes are used to get around a bug in simpleubjson where it decodes a byte array as a string, so with invalid unicode values in python3 it will fail hard. Instead I map it to a list of ints.
+def mapbytes(xs):
+    return [int(i) for i in xs]
+
+def unmapbytes(xs):
+    return bytes(xs)
+
+def encdecroutine(in_stream, out_stream, key, block_size, nonce_bytes, num_counter_bytes):
+    counter = 0
+    block = in_stream.read(block_size)
+    while len(block) > 0:
+        # Will except out if number is too big to fit in num_counter_bytes
+        counter_bytes = counter.to_bytes(num_counter_bytes, "big")
+        nonce = nonce_bytes + counter_bytes
+        encrypted_block = libnacl.crypto_stream_xor(block, nonce, key)
+        out_stream.write(encrypted_block)
+        block = in_stream.read(block_size)
+
+def decrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+    return
+
+def encrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+    magic_bytes = b'BR'
+    version = 2
+    # The first bytes (after the 2 magic bytes) are of 2 shorts in network byte order.
+    # it contains the version number followed by the number of bytes the metadata takes up
+    first_bytes_format = "!HH"
+    # TODO: reduce the counter bytes and instead redo the encryption or have another random nonce when the counter bytes run out, so we can support arbitrary size streams.
+    # Currently, it will error out with a stream larger than (2^(8*counter_bytes) * block_size) bytes
+    # For the defaults of 5 and 512, that is 512 TB, which is probably enough for any usage of it in the next couple of years, but as we all know, eventually we will want more.
+    # I don't want to increase counter_bytes any more, since if counter_bytes is increased, then the likelyhood of this nonce being reused is increased. Do I need to worry about that if the secret key is regenerated each time? I may just be able to increase counter_bytes significantly.
+    num_counter_bytes = 5
+    # TODO: support symmetric encryption
+    sym_key = libnacl.utils.salsa_key()
+    nonce_bytes = libnacl.randombytes(libnacl.crypto_box_NONCEBYTES - num_counter_bytes)
+    if None == secret_key:
+        sign_key = libnacl.public.SecretKey()
+    else:
+        sign_key = secret_key
+
+    secure_metadata = {
+        "key": mapbytes(sym_key),
+        "nonce_bytes": mapbytes(nonce_bytes),
+        "block_size": block_size,
+    }
+    bin_secure_metadata = simpleubjson.encode(secure_metadata)
+    smdbox = libnacl.public.Box(sign_key.sk, public_key.pk)
+    encrypted_metadata = smdbox.encrypt(bin_secure_metadata)
+    metadata = {
+        "algorithm": "asymmetric-vblock-curve25519-salsa20",
+        "sign_key": mapbytes(sign_key.pk),
+        "secure": mapbytes(encrypted_metadata),
+    }
+    encoded_metadata = simpleubjson.encode(metadata)
+    metadata_length = len(encoded_metadata)
+    first_bytes = struct.pack(first_bytes_format, version, metadata_length)
+
+    out_stream.write(magic_bytes)
+    out_stream.write(first_bytes)
+    out_stream.write(encoded_metadata)
+
+    encdecroutine(in_stream, out_stream, sym_key, block_size, nonce_bytes, num_counter_bytes)
+    
+    return
+
+def generate(public_key, secret_key, symmetric):
+    if None == public_key or None == secret_key:
+        sys.exit("Please specify a public key and a secret key")
+    elif os.path.exists(public_key):
+        sys.exit("Public key already exists, exiting")
+    elif os.path.exists(secret_key):
+        sys.exit("Secret key already exists, exiting")
+    else:
+        seckey = libnacl.public.SecretKey()
+        pubkey = libnacl.public.PublicKey(seckey.pk)
+        seckey.save(secret_key)
+        pubkey.save(public_key)
+
+def main():
+    args = parse()
+    if args.generate:
+        generate(public_key=args.public_key, secret_key=args.secret_key, symmetric=args.symmetric)
+    else:
+        if None != args.public_key:
+            public_key = libnacl.utils.load_key(args.public_key)
+        else:
+            public_key = None
+        if None != args.secret_key:
+            secret_key = libnacl.utils.load_key(args.secret_key)
+        else:
+            secret_key = None
+        if args.decrypt:
+            decrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+        else:
+            encrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+
+if __name__ == "__main__":
+    main()
