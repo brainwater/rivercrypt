@@ -21,6 +21,9 @@ def parse():
     parser.add_argument("-bs", "--block-size", type=int, default=512, help="Block size of chunks in bytes")
     return parser.parse_args()
 
+magic_bytes = b'BR'
+first_bytes_format = "!HH"
+
 # mapbytes and unmapbtyes are used to get around a bug in simpleubjson where it decodes a byte array as a string, so with invalid unicode values in python3 it will fail hard. Instead I map it to a list of ints.
 def mapbytes(xs):
     return [int(i) for i in xs]
@@ -39,15 +42,42 @@ def encdecroutine(in_stream, out_stream, key, block_size, nonce_bytes, num_count
         out_stream.write(encrypted_block)
         block = in_stream.read(block_size)
 
+# I am foregoing support for format versions 1 and 2 since I have not yet released this to simplify the code
+
 def decrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+    mBytes = in_stream.read(len(magic_bytes))
+    if mBytes != magic_bytes:
+        raise Exception("Unknown magic number")
+    first_bytes = in_stream.read(struct.calcsize(first_bytes_format))
+    version, metadata_length = struct.unpack(first_bytes_format, first_bytes)
+    if 3 == version:
+        metadata_bytes = in_stream.read(metadata_length)
+        md = dict(simpleubjson.decode(metadata_bytes))
+        metadata = {
+            "algorithm": md["algorithm"],
+            "sign_key": unmapbytes(md["sign_key"]),
+        }
+        encrypted_metadata_bytes = unmapbytes(md["secure"])
+        sign_key = libnacl.public.PublicKey(metadata["sign_key"])
+        if None != public_key and sign_key.pk != public_key.pk:
+            raise Exception("Metadata failed to pass signature verification")
+        smdbox = libnacl.public.Box(secret_key.sk, sign_key.pk)
+        secure_metadata_bytes = smdbox.decrypt(encrypted_metadata_bytes)
+        smd = dict(simpleubjson.decode(secure_metadata_bytes))
+        metadata["key"] = unmapbytes(smd["key"])
+        metadata["nonce_bytes"] = unmapbytes(smd["nonce_bytes"])
+        metadata["block_size"] = smd["block_size"]
+        num_counter_bytes = libnacl.crypto_box_NONCEBYTES - len(metadata["nonce_bytes"])
+
+        encdecroutine(in_stream, out_stream, metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
+    else:
+        raise Exception("Unsupported format version: " + str(version))
     return
 
 def encrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
-    magic_bytes = b'BR'
-    version = 2
+    version = 3
     # The first bytes (after the 2 magic bytes) are of 2 shorts in network byte order.
     # it contains the version number followed by the number of bytes the metadata takes up
-    first_bytes_format = "!HH"
     # TODO: reduce the counter bytes and instead redo the encryption or have another random nonce when the counter bytes run out, so we can support arbitrary size streams.
     # Currently, it will error out with a stream larger than (2^(8*counter_bytes) * block_size) bytes
     # For the defaults of 5 and 512, that is 512 TB, which is probably enough for any usage of it in the next couple of years, but as we all know, eventually we will want more.
