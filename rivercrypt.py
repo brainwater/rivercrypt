@@ -19,6 +19,7 @@ def parse():
     parser.add_argument("-f", "--force", action="store_true", help="Force decryption when verification of signatures fail. Note: only applicable when decrypting a symmetric stream that has each chunk of the datastream signed. Useful for decrypting data that may have been slightly corrupted. This is not yet supported.")
     parser.add_argument("-g", "--generate", action="store_true", help="Generate a secret and public key pair")
     parser.add_argument("-bs", "--block-size", type=int, default=512, help="Block size of chunks in bytes")
+    parser.add_argument("-e", "--extract", action="store_true", help="Extract the public key from a secret key, in case you lost the public key")
     return parser.parse_args()
 
 magic_bytes = b'BR'
@@ -129,10 +130,25 @@ def generate(public_key, secret_key, symmetric):
         seckey.save(secret_key)
         pubkey.save(public_key)
 
+def extract(public_key, secret_key):
+    if None == public_key or None == secret_key:
+        sys.exit("Please specify a secret key and a path to save the public key")
+    elif os.path.exists(public_key):
+        sys.exit("Public key already exists, exiting")
+    elif not os.path.exists(secret_key):
+        sys.exit("Secret key does not exist, exiting")
+    else:
+        seckey = libnacl.utils.load_key(secret_key)
+        pubkey = libnacl.public.PublicKey(seckey.pk)
+        pubkey.save(public_key)
+
+    
 def main():
     args = parse()
     if args.generate:
         generate(public_key=args.public_key, secret_key=args.secret_key, symmetric=args.symmetric)
+    elif args.extract:
+        extract(public_key=args.public_key, secret_key=args.secret_key)
     else:
         if None != args.public_key:
             public_key = libnacl.utils.load_key(args.public_key)
