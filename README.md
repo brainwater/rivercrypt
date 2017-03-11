@@ -34,7 +34,7 @@ Takes standard input and encrypts/decrypts it to standard output
 
 ```$ cat ~/temp/testfile.txt | ./rivercrypt.py -pk ~/temp/public_key > ~/temp/encryptedtestfile.txt.rca```
 
-```$ cat ~/temp/encryptedtestfile.rca | ./rivercrypt.py -sk ~/temp/secret_key > ~/temp/decryptedtestfile.txt
+```$ cat ~/temp/encryptedtestfile.rca | ./rivercrypt.py -sk ~/temp/secret_key > ~/temp/decryptedtestfile.txt```
 
 ## Requirements
 python3, python3-pip
