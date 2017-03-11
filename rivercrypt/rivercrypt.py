@@ -28,7 +28,10 @@ def parse():
 
 MAGIC_BYTES = b'BR'
 FIRST_BYTES_FORMAT = "!HH"
-NONCE_COUNTER_BYTES = 30
+# With 8 bytes, the possible number of blocks is 2^8*8 = 1.844e+19
+# That allows us to have 16,384 Petablocks before overflowing the counter
+# Which allows us to have files with up to 8,388,608 Petabytes
+NONCE_COUNTER_BYTES = 8
 
 # mapbytes and unmapbtyes are used to get around a bug in simpleubjson where it decodes a byte array as a string, so with invalid unicode values in python3 it will fail hard. Instead I map it to a list of ints.
 def mapbytes(xs):
@@ -113,8 +116,8 @@ def encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     
     return
 
-def schedule_nonce(initialkey, idx, numbytes):
-    msg = idx.to_bytes(NONCE_COUNTER_BYTES, "big")
+def schedule_nonce(initialkey, idx, numbytes, counter_bytes):
+    msg = idx.to_bytes(counter_bytes, "big")
     h = hmac.new(initialkey, msg=msg, digestmod='sha512')
     return h.digest()
 
@@ -124,7 +127,7 @@ def encdecroutine4(in_stream, out_stream, key, block_size, initial_nonce, num_co
     while len(block) > 0:
         # Will except out if number is too big to fit in int with number of bytes NONCE_COUNTER_BYTES
         #counter_bytes = counter.to_bytes(num_counter_bytes, "big")
-        nonce = schedule_nonce(initial_nonce, counter, libnacl.crypto_box_NONCEBYTES)
+        nonce = schedule_nonce(initial_nonce, counter, libnacl.crypto_box_NONCEBYTES, num_counter_bytes)
         counter += 1
         encrypted_block = libnacl.crypto_stream_xor(block, nonce, key)
         out_stream.write(encrypted_block)
@@ -146,7 +149,7 @@ def decrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     metadata["key"] = smd["key"]
     metadata["nonce_bytes"] = smd["nonce_bytes"]
     metadata["block_size"] = smd["block_size"]
-    num_counter_bytes = libnacl.crypto_box_NONCEBYTES
+    num_counter_bytes = smd['nonce_counter_bytes']
 
     encdecroutine4(in_stream, out_stream, metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
     return
@@ -163,6 +166,7 @@ def encrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
         "key": sym_key,
         "nonce_bytes": nonce_bytes,
         "block_size": block_size,
+        "nonce_counter_bytes": NONCE_COUNTER_BYTES,
     }
     secure_metadata_bytes = ubjson.dumpb(secure_metadata)
     smdbox = libnacl.public.Box(sign_key.sk, public_key.pk)
@@ -178,7 +182,7 @@ def encrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     out_stream.write(MAGIC_BYTES)
     out_stream.write(first_bytes)
     out_stream.write(encoded_metadata)
-    encdecroutine4(in_stream, out_stream, sym_key, block_size, nonce_bytes, libnacl.crypto_box_NONCEBYTES)
+    encdecroutine4(in_stream, out_stream, sym_key, block_size, nonce_bytes, NONCE_COUNTER_BYTES)
     
 
 def encrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
