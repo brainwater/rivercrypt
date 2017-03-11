@@ -8,8 +8,8 @@ setup(
     author = 'Blake Rainwater',
     author_email = 'rainwaterblake@gmail.com',
     url = 'https://github.com/brainwater/rivercrypt',
-    download_url = 'https://github.com/brainwater/rivercrypt/tarball/v0.3.1',
+    #download_url = 'https://github.com/brainwater/rivercrypt/tarball/v0.3.1',
     keywords = ['encryption'],
     classifiers = [],
-    install_requires = ['libnacl', 'simpleubjson'],
+    install_requires = ['libnacl', 'simpleubjson', 'py-ubjson'],
 )
