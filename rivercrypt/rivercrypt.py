@@ -1,14 +1,16 @@
 #!/usr/bin/python3
-import sys
-import struct
-import os.path
 import argparse
-import simpleubjson
-import libnacl
-import libnacl.utils
-import libnacl.public
-import ubjson
 import hmac
+import sys
+import os
+import os.path
+import struct
+
+import libnacl
+import libnacl.public
+import libnacl.utils
+import simpleubjson
+import ubjson
 
 
 def getparser():
