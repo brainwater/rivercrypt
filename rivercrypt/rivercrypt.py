@@ -13,19 +13,30 @@ import hmac
 
 def getparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-pk", "--public-key", type=str, help="Public key used for encryption or for checking the signature")
-    parser.add_argument("-sk", "--secret-key", type=str, help="Secret key used for decryption or for signing")
-    parser.add_argument("-va", "--verify-all", action="store_true", help="Sign each chunk of the datastream if encrypting, or verify each chunk of the datastream if decrypting. This ensures data integrity. This is not yet supported")
-    parser.add_argument("-d", "--decrypt", action="store_true", help="Decrypt stdin and put it on stdout")
-    parser.add_argument("-s", "--symmetric", action="store_true", help="Use symmetric encryption. This is not yet supported")
+    parser.add_argument("-pk", "--public-key", type=str,
+                        help="Public key used for encryption or for checking the signature")
+    parser.add_argument("-sk", "--secret-key", type=str,
+                        help="Secret key used for decryption or for signing")
+    parser.add_argument("-va", "--verify-all", action="store_true",
+                        help="Sign each chunk of the datastream if encrypting, or verify each chunk of the datastream if decrypting. This ensures data integrity. This is not yet supported")
+    parser.add_argument("-d", "--decrypt", action="store_true",
+                        help="Decrypt stdin and put it on stdout")
+    parser.add_argument("-s", "--symmetric", action="store_true",
+                        help="Use symmetric encryption. This is not yet supported")
     parser.add_argument("-f", "--force", action="store_true", help="Force decryption when verification of signatures fail. Note: only applicable when decrypting a symmetric stream that has each chunk of the datastream signed. Useful for decrypting data that may have been slightly corrupted. This is not yet supported.")
-    parser.add_argument("-g", "--generate", action="store_true", help="Generate a secret and public key pair")
-    parser.add_argument("-bs", "--block-size", type=int, default=512, help="Block size of chunks in bytes")
-    parser.add_argument("-e", "--extract", action="store_true", help="Extract the public key from a secret key, in case you lost the public key")
+    parser.add_argument("-g", "--generate", action="store_true",
+                        help="Generate a secret and public key pair")
+    parser.add_argument("-bs", "--block-size", type=int,
+                        default=512, help="Block size of chunks in bytes")
+    parser.add_argument("-e", "--extract", action="store_true",
+                        help="Extract the public key from a secret key, in case you lost the public key")
     return parser
+
+
 def parse():
     parser = getparser()
     return parser.parse_args()
+
 
 MAGIC_BYTES = b'BR'
 FIRST_BYTES_FORMAT = "!HH"
@@ -34,12 +45,18 @@ FIRST_BYTES_FORMAT = "!HH"
 # Which allows us to have files with up to 8,388,608 Petabytes
 NONCE_COUNTER_BYTES = 8
 
-# mapbytes and unmapbtyes are used to get around a bug in simpleubjson where it decodes a byte array as a string, so with invalid unicode values in python3 it will fail hard. Instead I map it to a list of ints.
+# mapbytes and unmapbtyes are used to get around a bug in simpleubjson
+# where it decodes a byte array as a string, so with invalid unicode
+# values in python3 it will fail hard. Instead I map it to a list of ints.
+
+
 def mapbytes(xs):
     return [int(i) for i in xs]
 
+
 def unmapbytes(xs):
     return bytes(xs)
+
 
 def encdecroutine3(in_stream, out_stream, key, block_size, nonce_bytes, num_counter_bytes):
     counter = 0
@@ -52,7 +69,10 @@ def encdecroutine3(in_stream, out_stream, key, block_size, nonce_bytes, num_coun
         out_stream.write(encrypted_block)
         block = in_stream.read(block_size)
 
-# I am foregoing support for format versions 1 and 2 since I have not yet released this to simplify the code
+# I am foregoing support for format versions 1 and 2 since I have not yet
+# released this to simplify the code
+
+
 def decrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size, metadata_length):
     metadata_bytes = in_stream.read(metadata_length)
     md = dict(simpleubjson.decode(metadata_bytes))
@@ -70,10 +90,13 @@ def decrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     metadata["key"] = unmapbytes(smd["key"])
     metadata["nonce_bytes"] = unmapbytes(smd["nonce_bytes"])
     metadata["block_size"] = smd["block_size"]
-    num_counter_bytes = libnacl.crypto_box_NONCEBYTES - len(metadata["nonce_bytes"])
+    num_counter_bytes = libnacl.crypto_box_NONCEBYTES - \
+        len(metadata["nonce_bytes"])
 
-    encdecroutine3(in_stream, out_stream, metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
+    encdecroutine3(in_stream, out_stream,
+                   metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
     return
+
 
 def encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
     version = 3
@@ -82,11 +105,16 @@ def encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     # TODO: reduce the counter bytes and instead redo the encryption or have another random nonce when the counter bytes run out, so we can support arbitrary size streams.
     # Currently, it will error out with a stream larger than (2^(8*counter_bytes) * block_size) bytes
     # For the defaults of 5 and 512, that is 512 TiB, which is probably enough for any usage of it in the next couple of years, but as we all know, eventually we will want more.
-    # I don't want to increase counter_bytes any more, since if counter_bytes is increased, then the likelyhood of this nonce being reused is increased. Do I need to worry about that if the secret key is regenerated each time? I may just be able to increase counter_bytes significantly.
+    # I don't want to increase counter_bytes any more, since if counter_bytes
+    # is increased, then the likelyhood of this nonce being reused is
+    # increased. Do I need to worry about that if the secret key is
+    # regenerated each time? I may just be able to increase counter_bytes
+    # significantly.
     num_counter_bytes = 5
     # TODO: support symmetric encryption
     sym_key = libnacl.utils.salsa_key()
-    nonce_bytes = libnacl.randombytes(libnacl.crypto_box_NONCEBYTES - num_counter_bytes)
+    nonce_bytes = libnacl.randombytes(
+        libnacl.crypto_box_NONCEBYTES - num_counter_bytes)
     if None == secret_key:
         sign_key = libnacl.public.SecretKey()
     else:
@@ -113,14 +141,17 @@ def encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     out_stream.write(first_bytes)
     out_stream.write(encoded_metadata)
 
-    encdecroutine3(in_stream, out_stream, sym_key, block_size, nonce_bytes, num_counter_bytes)
-    
+    encdecroutine3(in_stream, out_stream, sym_key,
+                   block_size, nonce_bytes, num_counter_bytes)
+
     return
+
 
 def schedule_nonce(initialkey, idx, numbytes, counter_bytes):
     msg = idx.to_bytes(counter_bytes, "big")
     h = hmac.new(initialkey, msg=msg, digestmod='sha512')
     return h.digest()
+
 
 def encdecroutine4(in_stream, out_stream, key, block_size, initial_nonce, num_counter_bytes):
     counter = 0
@@ -128,12 +159,15 @@ def encdecroutine4(in_stream, out_stream, key, block_size, initial_nonce, num_co
     while len(block) > 0:
         # Will except out if number is too big to fit in int with number of bytes NONCE_COUNTER_BYTES
         #counter_bytes = counter.to_bytes(num_counter_bytes, "big")
-        nonce = schedule_nonce(initial_nonce, counter, libnacl.crypto_box_NONCEBYTES, num_counter_bytes)
+        nonce = schedule_nonce(initial_nonce, counter,
+                               libnacl.crypto_box_NONCEBYTES, num_counter_bytes)
         counter += 1
         encrypted_block = libnacl.crypto_stream_xor(block, nonce, key)
         out_stream.write(encrypted_block)
         block = in_stream.read(block_size)
     return
+
+
 def decrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size, metadata_length):
     metadata_bytes = in_stream.read(metadata_length)
     md = dict(ubjson.loadb(metadata_bytes))
@@ -152,8 +186,10 @@ def decrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     metadata["block_size"] = smd["block_size"]
     num_counter_bytes = smd['nonce_counter_bytes']
 
-    encdecroutine4(in_stream, out_stream, metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
+    encdecroutine4(in_stream, out_stream,
+                   metadata["key"], metadata["block_size"], metadata["nonce_bytes"], num_counter_bytes)
     return
+
 
 def encrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
     version = 4
@@ -183,15 +219,17 @@ def encrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     out_stream.write(MAGIC_BYTES)
     out_stream.write(first_bytes)
     out_stream.write(encoded_metadata)
-    encdecroutine4(in_stream, out_stream, sym_key, block_size, nonce_bytes, NONCE_COUNTER_BYTES)
-    
+    encdecroutine4(in_stream, out_stream, sym_key, block_size,
+                   nonce_bytes, NONCE_COUNTER_BYTES)
+
 
 def encrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
-    #if version == 3:
+    # if version == 3:
     #    #return encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size)
     #    pass
-    #elif version == 4:
+    # elif version == 4:
     return encrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size)
+
 
 def decrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
     mBytes = in_stream.read(len(MAGIC_BYTES))
@@ -200,12 +238,15 @@ def decrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric
     first_bytes = in_stream.read(struct.calcsize(FIRST_BYTES_FORMAT))
     version, metadata_length = struct.unpack(FIRST_BYTES_FORMAT, first_bytes)
     if 3 == version:
-        decrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size, metadata_length)
+        decrypt3(in_stream, out_stream, public_key, secret_key,
+                 verify_all, symmetric, force, block_size, metadata_length)
     elif version == 4:
-        decrypt4(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size, metadata_length)
+        decrypt4(in_stream, out_stream, public_key, secret_key,
+                 verify_all, symmetric, force, block_size, metadata_length)
     else:
         raise Exception("Unsupported format version: " + str(version))
     return
+
 
 def generate(public_key, secret_key, symmetric):
     if None == public_key or None == secret_key:
@@ -221,20 +262,26 @@ def generate(public_key, secret_key, symmetric):
         pubkey.save(public_key)
     return
 
+
 def decstream(in_stream, out_stream, public_key, secret_key):
     args = getparser().parse_args([])
     args.decrypt = True
-    decrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+    decrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key,
+            verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
     return
-    
+
+
 def encstream(in_stream, out_stream, public_key, secret_key):
     args = getparser().parse_args([])
     args.decrypt = False
-    encrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+    encrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key,
+            verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
     return
+
 
 def loadkey(filename):
     return libnacl.utils.load_key(filename)
+
 
 def extract(public_key, secret_key):
     if None == public_key or None == secret_key:
@@ -252,7 +299,8 @@ def extract(public_key, secret_key):
 def main():
     args = parse()
     if args.generate:
-        generate(public_key=args.public_key, secret_key=args.secret_key, symmetric=args.symmetric)
+        generate(public_key=args.public_key,
+                 secret_key=args.secret_key, symmetric=args.symmetric)
     elif args.extract:
         extract(public_key=args.public_key, secret_key=args.secret_key)
     else:
@@ -265,9 +313,12 @@ def main():
         else:
             secret_key = None
         if args.decrypt:
-            decrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+            decrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key,
+                    verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
         else:
-            encrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key, verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+            encrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key,
+                    verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+
 
 if __name__ == "__main__":
     main()
