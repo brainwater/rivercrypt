@@ -69,4 +69,4 @@ I am not a cryptography professional, however I did try to follow the best pract
 I may have made a mistake that would cause this to not be reliable or secure.
 I am providing this softare as-is and make no warranty as to the security or integrity of this software.
 
-With that said, I believe that this is secure, though I wouldn't yet use this to encrypt my passwords file and then publish it on pastebin.
+With that said, I believe that this is secure, though I wouldn't yet use this to encrypt my passwords file and then publish it on pastebin. That was wrong to believe when said. With format version 3, the nonce used was the same for each and every block, causing the encryption to be easily broken.
