@@ -14,25 +14,61 @@ import nacl.public
 # 16 bytes are used for signature
 SECRET_BOX_SIGN_SIZE = 16
 
+
 def getparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-pk", "--public-key", type=str,
-                        help="Public key used for encryption or for checking the signature")
-    parser.add_argument("-sk", "--secret-key", type=str,
-                        help="Secret key used for decryption or for signing")
-    parser.add_argument("-va", "--verify-all", action="store_true",
-                        help="Sign each chunk of the datastream if encrypting, or verify each chunk of the datastream if decrypting. This ensures data integrity. This is not yet supported")
-    parser.add_argument("-d", "--decrypt", action="store_true",
-                        help="Decrypt stdin and put it on stdout")
-    parser.add_argument("-s", "--symmetric", action="store_true",
-                        help="Use symmetric encryption. This is not yet supported")
-    parser.add_argument("-f", "--force", action="store_true", help="Force decryption when verification of signatures fail. Note: only applicable when decrypting a symmetric stream that has each chunk of the datastream signed. Useful for decrypting data that may have been slightly corrupted. This is not yet supported.")
-    parser.add_argument("-g", "--generate", action="store_true",
-                        help="Generate a secret and public key pair")
-    parser.add_argument("-bs", "--block-size", type=int,
-                        default=512, help="Block size of chunks in bytes")
-    parser.add_argument("-e", "--extract", action="store_true",
-                        help="Extract the public key from a secret key, in case you lost the public key")
+    parser.add_argument(
+        "-pk",
+        "--public-key",
+        type=str,
+        help="Public key used for encryption or for checking the signature")
+    parser.add_argument(
+        "-sk",
+        "--secret-key",
+        type=str,
+        help="Secret key used for decryption or for signing")
+    parser.add_argument(
+        "-va",
+        "--verify-all",
+        action="store_true",
+        help=
+        "Sign each chunk of the datastream if encrypting, or verify each chunk of the datastream if decrypting. This ensures data integrity. This is not yet supported"
+    )
+    parser.add_argument(
+        "-d",
+        "--decrypt",
+        action="store_true",
+        help="Decrypt stdin and put it on stdout")
+    parser.add_argument(
+        "-s",
+        "--symmetric",
+        action="store_true",
+        help="Use symmetric encryption. This is not yet supported")
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help=
+        "Force decryption when verification of signatures fail. Note: only applicable when decrypting a symmetric stream that has each chunk of the datastream signed. Useful for decrypting data that may have been slightly corrupted. This is not yet supported."
+    )
+    parser.add_argument(
+        "-g",
+        "--generate",
+        action="store_true",
+        help="Generate a secret and public key pair")
+    parser.add_argument(
+        "-bs",
+        "--block-size",
+        type=int,
+        default=512,
+        help="Block size of chunks in bytes")
+    parser.add_argument(
+        "-e",
+        "--extract",
+        action="store_true",
+        help=
+        "Extract the public key from a secret key, in case you lost the public key"
+    )
     return parser
 
 
@@ -46,7 +82,9 @@ def parse():
 MAGIC_BYTES = b'BR'
 FIRST_BYTES_FORMAT = "!HH"
 
-def decrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size, metadata_length):
+
+def decrypt5(in_stream, out_stream, public_key, secret_key, verify_all,
+             symmetric, force, block_size, metadata_length):
     metadata_bytes = in_stream.read(metadata_length)
     md = dict(ubjson.loadb(metadata_bytes))
     metadata = {}
@@ -55,7 +93,9 @@ def decrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     else:
         sign_key_encoded = md['sign_key']
         if md['sign_key'] != public_key:
-            print("WARNING: sign_key in metadata and public key provided don't match", file=sys.stderr)
+            print(
+                "WARNING: sign_key in metadata and public key provided don't match",
+                file=sys.stderr)
     metadata['sign_key'] = nacl.public.PublicKey(sign_key_encoded)
     metadata['secret_key'] = nacl.public.PrivateKey(secret_key)
 
@@ -71,14 +111,17 @@ def decrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     block = in_stream.read(block_size)
     while len(block) > 0:
         # Use network endianness
-        counternonce = counter.to_bytes(nacl.secret.SecretBox.NONCE_SIZE, "big")
+        counternonce = counter.to_bytes(nacl.secret.SecretBox.NONCE_SIZE,
+                                        "big")
         out_block = decrypt_box.decrypt(block, nonce=counternonce)
         out_stream.write(out_block)
         block = in_stream.read(block_size)
         counter += 1
     return
 
-def encrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+
+def encrypt5(in_stream, out_stream, public_key, secret_key, verify_all,
+             symmetric, force, block_size):
     version = 5
     sym_key = nacl.utils.random(nacl.secret.SecretBox.KEY_SIZE)
     if None == secret_key:
@@ -114,8 +157,10 @@ def encrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
     block = in_stream.read(block_size)
     while len(block) > 0:
         # Use network endianness
-        counternonce = counter.to_bytes(nacl.secret.SecretBox.NONCE_SIZE, "big")
-        out_block = encrypter_box.encrypt(block, nonce=counternonce)._ciphertext
+        counternonce = counter.to_bytes(nacl.secret.SecretBox.NONCE_SIZE,
+                                        "big")
+        out_block = encrypter_box.encrypt(
+            block, nonce=counternonce)._ciphertext
         # We are counting on this for the decryption
         assert len(out_block) == SECRET_BOX_SIGN_SIZE + len(block)
         out_stream.write(out_block)
@@ -123,29 +168,33 @@ def encrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetri
         counter += 1
     return
 
-def encrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+
+def encrypt(in_stream, out_stream, public_key, secret_key, verify_all,
+            symmetric, force, block_size):
     # if version == 3:
     #    #return encrypt3(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size)
     #    pass
     # elif version == 4:
-    return encrypt5(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size)
+    return encrypt5(in_stream, out_stream, public_key, secret_key, verify_all,
+                    symmetric, force, block_size)
 
 
-def decrypt(in_stream, out_stream, public_key, secret_key, verify_all, symmetric, force, block_size):
+def decrypt(in_stream, out_stream, public_key, secret_key, verify_all,
+            symmetric, force, block_size):
     mBytes = in_stream.read(len(MAGIC_BYTES))
     if mBytes != MAGIC_BYTES:
         raise Exception("Unknown magic number: " + str(mBytes))
     first_bytes = in_stream.read(struct.calcsize(FIRST_BYTES_FORMAT))
     version, metadata_length = struct.unpack(FIRST_BYTES_FORMAT, first_bytes)
     if 3 == version:
-        decrypt3(in_stream, out_stream, public_key, secret_key,
-                 verify_all, symmetric, force, block_size, metadata_length)
+        decrypt3(in_stream, out_stream, public_key, secret_key, verify_all,
+                 symmetric, force, block_size, metadata_length)
     elif version == 4:
-        decrypt4(in_stream, out_stream, public_key, secret_key,
-                 verify_all, symmetric, force, block_size, metadata_length)
+        decrypt4(in_stream, out_stream, public_key, secret_key, verify_all,
+                 symmetric, force, block_size, metadata_length)
     elif version == 5:
-        decrypt5(in_stream, out_stream, public_key, secret_key,
-                 verify_all, symmetric, force, block_size, metadata_length)
+        decrypt5(in_stream, out_stream, public_key, secret_key, verify_all,
+                 symmetric, force, block_size, metadata_length)
     else:
         raise Exception("Unsupported format version: " + str(version))
     return
@@ -177,16 +226,30 @@ def genkey():
 def decstream(in_stream, out_stream, public_key, secret_key):
     args = getparser().parse_args([])
     args.decrypt = True
-    decrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key,
-            verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+    decrypt(
+        in_stream=in_stream,
+        out_stream=out_stream,
+        public_key=public_key,
+        secret_key=secret_key,
+        verify_all=args.verify_all,
+        symmetric=args.symmetric,
+        force=args.force,
+        block_size=args.block_size)
     return
 
 
 def encstream(in_stream, out_stream, public_key, secret_key):
     args = getparser().parse_args([])
     args.decrypt = False
-    encrypt(in_stream=in_stream, out_stream=out_stream, public_key=public_key, secret_key=secret_key,
-            verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+    encrypt(
+        in_stream=in_stream,
+        out_stream=out_stream,
+        public_key=public_key,
+        secret_key=secret_key,
+        verify_all=args.verify_all,
+        symmetric=args.symmetric,
+        force=args.force,
+        block_size=args.block_size)
     return
 
 
@@ -198,7 +261,8 @@ def loadfile(filename):
 
 def extract(public_key, secret_key):
     if None == public_key or None == secret_key:
-        sys.exit("Please specify a secret key and a path to save the public key")
+        sys.exit(
+            "Please specify a secret key and a path to save the public key")
     elif os.path.exists(public_key):
         sys.exit("Public key already exists, exiting")
     elif not os.path.exists(secret_key):
@@ -214,8 +278,10 @@ def extract(public_key, secret_key):
 def main():
     args = parse()
     if args.generate:
-        generate(public_key=args.public_key,
-                 secret_key=args.secret_key, symmetric=args.symmetric)
+        generate(
+            public_key=args.public_key,
+            secret_key=args.secret_key,
+            symmetric=args.symmetric)
     elif args.extract:
         extract(public_key=args.public_key, secret_key=args.secret_key)
     else:
@@ -228,11 +294,25 @@ def main():
         else:
             secret_key = None
         if args.decrypt:
-            decrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key,
-                    verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+            decrypt(
+                in_stream=sys.stdin.buffer,
+                out_stream=sys.stdout.buffer,
+                public_key=public_key,
+                secret_key=secret_key,
+                verify_all=args.verify_all,
+                symmetric=args.symmetric,
+                force=args.force,
+                block_size=args.block_size)
         else:
-            encrypt(in_stream=sys.stdin.buffer, out_stream=sys.stdout.buffer, public_key=public_key, secret_key=secret_key,
-                    verify_all=args.verify_all, symmetric=args.symmetric, force=args.force, block_size=args.block_size)
+            encrypt(
+                in_stream=sys.stdin.buffer,
+                out_stream=sys.stdout.buffer,
+                public_key=public_key,
+                secret_key=secret_key,
+                verify_all=args.verify_all,
+                symmetric=args.symmetric,
+                force=args.force,
+                block_size=args.block_size)
 
 
 if __name__ == "__main__":

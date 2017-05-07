@@ -20,8 +20,8 @@ class CurrentVersionTestCase(unittest.TestCase):
         for i in range(10):
             flen = random.randrange(1000000)
             self.testfiles[i] = os.urandom(flen)
-        self.pkeys, self.skeys = zip(*[rivercrypt.genkey() for i in range(5)])
-        
+        self.pkeys, self.skeys = zip(* [rivercrypt.genkey() for i in range(5)])
+
         #keyfiledir = os.path.join(TEST_DIR, 'keys')
         """for f in sorted(os.listdir(keyfiledir)):
             if f.startswith('secretkey'):
@@ -30,7 +30,7 @@ class CurrentVersionTestCase(unittest.TestCase):
             elif f.startswith('publickey'):
                 self.pkeys.append(rivercrypt.loadkey(
                     os.path.join(keyfiledir, f)))"""
-        
+
         self.assertEqual(len(self.skeys), len(self.pkeys))
         self.pairs = []
         for i in range(len(self.skeys)):
@@ -45,8 +45,8 @@ class CurrentVersionTestCase(unittest.TestCase):
                 print('Encrypting file:', f)
                 with io.BytesIO(self.testfiles[f]) as stream:
                     with io.BytesIO() as outstream:
-                        rivercrypt.encstream(
-                            stream, outstream, self.pkeys[p], self.skeys[s])
+                        rivercrypt.encstream(stream, outstream, self.pkeys[p],
+                                             self.skeys[s])
                         data = outstream.getvalue()
                         self.encfiles[(s, p)][f] = data
 
@@ -57,7 +57,7 @@ class CurrentVersionTestCase(unittest.TestCase):
                 print('Testing file:', f)
                 with io.BytesIO(self.encfiles[(s, p)][f]) as instream:
                     with io.BytesIO() as outstream:
-                        rivercrypt.decstream(
-                            instream, outstream, self.pkeys[s], self.skeys[p])
-                        self.assertEqual(
-                            self.testfiles[f], outstream.getvalue())
+                        rivercrypt.decstream(instream, outstream,
+                                             self.pkeys[s], self.skeys[p])
+                        self.assertEqual(self.testfiles[f],
+                                         outstream.getvalue())
