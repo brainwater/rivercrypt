@@ -3,6 +3,7 @@ import unittest
 import os
 import os.path
 import io
+import random
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -10,21 +11,26 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 class CurrentVersionTestCase(unittest.TestCase):
     def setUp(self):
         self.testfiles = {}
-        testfiledir = os.path.join(TEST_DIR, 'data', 'testfiles')
+        """testfiledir = os.path.join(TEST_DIR, 'data', 'testfiles')
         for fname in os.listdir(testfiledir):
             testfile = os.path.join(testfiledir, fname)
             with open(testfile, 'rb') as tf:
-                self.testfiles[fname] = tf.read()
-        self.skeys = []
-        self.pkeys = []
-        keyfiledir = os.path.join(TEST_DIR, 'keys')
-        for f in sorted(os.listdir(keyfiledir)):
+                self.testfiles[fname] = tf.read()"""
+        random.seed(42)
+        for i in range(10):
+            flen = random.randrange(1000000)
+            self.testfiles[i] = os.urandom(flen)
+        self.pkeys, self.skeys = zip(*[rivercrypt.genkey() for i in range(5)])
+        
+        #keyfiledir = os.path.join(TEST_DIR, 'keys')
+        """for f in sorted(os.listdir(keyfiledir)):
             if f.startswith('secretkey'):
                 self.skeys.append(rivercrypt.loadkey(
                     os.path.join(keyfiledir, f)))
             elif f.startswith('publickey'):
                 self.pkeys.append(rivercrypt.loadkey(
-                    os.path.join(keyfiledir, f)))
+                    os.path.join(keyfiledir, f)))"""
+        
         self.assertEqual(len(self.skeys), len(self.pkeys))
         self.pairs = []
         for i in range(len(self.skeys)):

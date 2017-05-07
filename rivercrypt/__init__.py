@@ -1,4 +1,4 @@
-from .rivercrypt import loadkey, encstream, decstream, main
+from .rivercrypt import loadkey, encstream, decstream, main, genkey
 __all__ = [
-    'loadkey', 'encstream', 'decstream', 'main'
+    'loadkey', 'encstream', 'decstream', 'main', 'genkey'
 ]
