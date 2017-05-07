@@ -1,4 +1,7 @@
 # rivercrypt
+
+[![Build Status](https://travis-ci.org/brainwater/rivercrypt.svg?branch=master)](https://travis-ci.org/brainwater/rivercrypt)
+
 Simple unix style utility for asymmetrically encrypting and decrypting files in a shell pipeline
 
 ## Usage
